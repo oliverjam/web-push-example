@@ -1,0 +1,9 @@
+#! /usr/bin/env sh
+
+PORT=5432 \
+deno run \
+  --unstable \
+  --allow-env=PORT \
+  --allow-net \
+  --allow-read=public/ \
+   server.js

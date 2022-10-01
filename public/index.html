@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web push test</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <button id="btn" hidden></button>
+    <pre id="debug"></pre>
+
+    <script type="module">
+      class Store extends EventTarget {
+        constructor() {
+          super();
+        }
+        on(...args) {
+          this.addEventListener(...args);
+        }
+        emit(name, detail) {
+          this.dispatchEvent(new CustomEvent(name, { detail }));
+        }
+      }
+
+      class PushManager extends EventTarget {
+        loading = this.load();
+
+        on(...args) {
+          this.addEventListener(...args);
+        }
+
+        emit(name, detail) {
+          this.dispatchEvent(new CustomEvent(name, { detail }));
+        }
+
+        async load() {
+          this.registration = await navigator.serviceWorker.ready;
+          this.emit("register");
+
+          this.subscription =
+            await this.registration.pushManager.getSubscription();
+          this.emit("change", this.subscription);
+          this.emit("load");
+        }
+
+        subscribe = async () => {
+          if (this.loading instanceof Promise) {
+            await this.loading;
+          }
+          let applicationServerKey = await (await fetch("./vapid")).text();
+          let sub = await this.registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            // applicationServerKey,
+          });
+          try {
+            await post("/register", sub);
+            this.emit("change", sub);
+          } catch (error) {
+            await sub.unsubscribe();
+            this.emit("error", error);
+          }
+        };
+
+        unsubscribe = async () => {
+          if (this.loading instanceof Promise) {
+            await this.loading;
+          }
+          await this.subscription.unsubscribe();
+          this.emit("change");
+        };
+      }
+
+      navigator.serviceWorker.register("service-worker.js");
+
+      let manager = new PushManager();
+
+      manager.on("load", () => {
+        btn.hidden = false;
+      });
+
+      manager.on("change", ({ detail: sub }) => {
+        if (sub) {
+          console.log("found subscription", sub);
+          debug.textContent = JSON.stringify(sub, null, 2);
+          btn.textContent = "Unubscribe";
+          btn.onclick = manager.unsubscribe;
+        } else {
+          debug.textContent = "";
+          console.log("no subscription");
+          btn.textContent = "Subscribe";
+          btn.onclick = manager.subscribe;
+        }
+      });
+
+      manager.on("error", ({ detail: e }) => {
+        console.error(e);
+        debug.textContent = e.message + "\n" + e.stack;
+      });
+
+      function post(url, body) {
+        return fetch(url, {
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+          method: "POST",
+        }).then((res) => {
+          if (!res.ok) throw new Error(res.status);
+          return res;
+        });
+      }
+    </script>
+  </body>
+</html>
