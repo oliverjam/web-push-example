@@ -11,18 +11,6 @@
     <pre id="debug"></pre>
 
     <script type="module">
-      class Store extends EventTarget {
-        constructor() {
-          super();
-        }
-        on(...args) {
-          this.addEventListener(...args);
-        }
-        emit(name, detail) {
-          this.dispatchEvent(new CustomEvent(name, { detail }));
-        }
-      }
-
       class PushManager extends EventTarget {
         loading = this.load();
 
@@ -51,6 +39,8 @@
           let applicationServerKey = await (await fetch("./vapid")).text();
           let sub = await this.registration.pushManager.subscribe({
             userVisibleOnly: true,
+            // Chrome/Edge require signed/encrypted notifications
+            // turns out this is v complex so ignoring for now
             // applicationServerKey,
           });
           try {
